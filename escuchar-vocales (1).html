@@ -1,0 +1,660 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Escuchar una vocal: espectro, formantes y MFCC</title>
+<style>
+:root{
+  --paper:#ffffff; --ink:#000000; --ink2:#444444; --ink3:#8a8a8a; --rule:#c8c8c8; --wash:#f0f0f0;
+  --c0:#0072B2; --c1:#D55E00; --c2:#009E73; --c3:#CC79A7; --c4:#B8860B; --c5:#4B9FD6; --c6:#8C564B; --c7:#6A3D9A;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){ --paper:#1d1d1d; --ink:#f4f4f4; --ink2:#c4c4c4; --ink3:#8f8f8f; --rule:#4c4c4c; --wash:#2b2b2b; --c0:#5AA9E6; --c1:#FF8A4C; --c2:#3CC7A0; --c3:#E8A2CF; --c4:#F2C14E; --c5:#9AD3F5; --c6:#D2A08E; --c7:#B79BE0; }
+}
+:root[data-theme="dark"]{ --paper:#1d1d1d; --ink:#f4f4f4; --ink2:#c4c4c4; --ink3:#8f8f8f; --rule:#4c4c4c; --wash:#2b2b2b; --c0:#5AA9E6; --c1:#FF8A4C; --c2:#3CC7A0; --c3:#E8A2CF; --c4:#F2C14E; --c5:#9AD3F5; --c6:#D2A08E; --c7:#B79BE0; }
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font-family:"Times New Roman",Times,"Liberation Serif","Nimbus Roman",serif;
+  font-size:19px;line-height:1.5;font-weight:400}
+main{max-width:1180px;margin:0 auto;padding:32px 24px 56px}
+h1{font-weight:400;font-size:2.3rem;line-height:1.12;margin:0 0 .5rem;max-width:22ch}
+h2{font-weight:400;font-size:1.45rem;margin:0 0 .6rem}
+.byline{margin:.2rem 0 1rem;font-size:1.1rem;line-height:1.35}
+.byline span{color:var(--ink2);font-size:.95rem}
+.lede{color:var(--ink2);max-width:64ch;margin:0 0 1.8rem}
+.controls{display:flex;flex-wrap:wrap;gap:18px 34px;align-items:flex-end;
+  padding:18px 0 20px;border-top:2px solid var(--ink);border-bottom:1px solid var(--rule)}
+fieldset{border:0;margin:0;padding:0;min-width:0}
+legend,.field>span{display:block;font-size:.88rem;color:var(--ink2);padding:0;margin-bottom:6px}
+.seg{display:flex;flex-wrap:wrap;border:1px solid var(--ink)}
+.seg input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+.seg label{padding:6px 14px;cursor:pointer;border-right:1px solid var(--rule);min-width:2.8em;text-align:center;user-select:none}
+.seg label:last-of-type{border-right:0}
+.seg input:checked+label{background:var(--ink);color:var(--paper)}
+.seg input:focus-visible+label{outline:2px solid var(--ink);outline-offset:2px}
+.field input{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--ink);padding:5px 10px;width:7.5em}
+.field input:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+button,.btn2{font:inherit;cursor:pointer;padding:7px 22px;border:1px solid var(--ink)}
+#rec{background:var(--ink);color:var(--paper);min-width:9.5em}
+#rec.on{background:var(--paper);color:var(--ink);border-width:2px;padding:6px 21px}
+.btn2{background:var(--paper);color:var(--ink);display:inline-block}
+button:focus-visible,.btn2:focus-within{outline:2px solid var(--ink);outline-offset:3px}
+.meter{height:4px;width:160px;background:var(--wash);visibility:hidden;margin-top:8px}
+.meter.on{visibility:visible}
+.meter span{display:block;height:100%;width:0;background:var(--ink)}
+#status{min-height:1.5em;margin:12px 0 20px;color:var(--ink2)}
+.grid{display:grid;gap:28px 40px;margin-bottom:34px}
+.grid.a{grid-template-columns:minmax(0,2fr) minmax(0,1fr)}
+.grid.b{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+figure{margin:0 0 34px;min-width:0}
+.grid figure{margin:0}
+figcaption{font-size:1.2rem;margin-bottom:8px}
+canvas{display:block;width:100%;border-top:1px solid var(--rule)}
+#cvSpec{height:330px}#cvSgram{height:250px}#cvVow{height:380px}#cvMfcc{height:300px}
+.note{font-size:.9rem;color:var(--ink2);margin:8px 0 0;max-width:70ch}
+.readout{border-left:1px solid var(--rule);padding-left:26px}
+.readout dl{margin:0}
+.readout dl>div{margin-top:14px}
+.readout dl>div:first-child{margin-top:0}
+.readout dt{font-size:.95rem;color:var(--ink2)}
+.readout dd{margin:0;font-size:2.7rem;line-height:1.05;font-variant-numeric:tabular-nums}
+.readout dd small{font-size:1rem;color:var(--ink2);margin-left:4px}
+.readout p{font-size:.88rem;color:var(--ink2);margin:4px 0 0}
+.check{display:flex;gap:8px;align-items:center;font-size:.9rem;color:var(--ink2);margin-top:8px}
+.scroll{overflow-x:auto;max-width:100%}
+table{border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:.95rem}
+th,td{padding:6px 12px;text-align:right;border-bottom:1px solid var(--rule);white-space:nowrap}
+th{font-weight:400;color:var(--ink2);border-bottom:1px solid var(--ink)}
+th:first-child,td:first-child,th.l,td.l{text-align:left}
+.warn{border:1px solid var(--ink);padding:12px 14px;margin:0 0 18px;font-size:.98rem}
+.help{margin:-8px 0 26px;font-size:.95rem;color:var(--ink2)}
+.help summary{cursor:pointer;color:var(--ink);min-height:32px}
+.help p{max-width:70ch;margin:.5rem 0}
+.mvals{display:grid;grid-template-columns:repeat(auto-fill,minmax(66px,1fr));margin-top:10px;border-top:1px solid var(--rule);font-variant-numeric:tabular-nums}
+.mvals div{padding:6px 8px;border-bottom:1px solid var(--rule)}
+.mvals span{display:block;font-size:.8rem;color:var(--ink3)}
+.recs{list-style:none;margin:0;padding:0;border-top:1px solid var(--ink)}
+.recs li{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:4px 16px;padding:10px 10px;border-bottom:1px solid var(--rule)}
+.recs li.empty{display:block}
+.recs .vals span{margin-right:14px;white-space:nowrap}
+.recs .vals i{font-style:normal;color:var(--ink3);margin-right:3px}
+.recs li.cur{background:var(--wash)}
+.recs .pick{display:flex;align-items:center;gap:8px;cursor:pointer;min-height:36px}
+.recs .pick small{color:var(--ink3);font-size:.85rem;margin-left:4px}
+.recs .vals{color:var(--ink2);font-variant-numeric:tabular-nums;font-size:.95rem}
+.recs .cmp{display:flex;align-items:center;gap:6px;font-size:.92rem;cursor:pointer;min-height:36px}
+.recs input{accent-color:var(--ink);width:18px;height:18px;margin:0}
+.recs button{padding:4px 12px;font-size:.88rem;background:var(--paper);color:var(--ink)}
+.empty{color:var(--ink3);font-style:italic}
+.method{border-top:1px solid var(--rule);padding-top:20px;margin-top:10px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.45fr);gap:28px 44px;align-items:start}
+.method p{max-width:72ch;color:var(--ink2);font-size:.95rem}
+.guide p{color:var(--ink2);font-size:.95rem;margin:0 0 .7rem}
+.guide table{font-size:.9rem;width:100%}
+.guide th,.guide td{text-align:left;white-space:normal;vertical-align:top;padding:7px 10px}
+.guide td:first-child{white-space:nowrap}
+.guide tr.sep td{border-bottom:1px solid var(--ink3)}
+.sw{display:inline-block;width:.8em;height:.8em;border-radius:50%;margin-right:6px;vertical-align:-.05em}
+@media (max-width:820px){
+  body{font-size:18px}
+  main{padding:22px 16px 40px}
+  h1{font-size:1.8rem}
+  .grid.a,.grid.b{grid-template-columns:minmax(0,1fr)}
+  .readout{border-left:0;padding-left:0;display:block}
+  .readout dl{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 14px}
+  .readout dl>div{margin-top:0}
+  .readout dd{font-size:1.9rem}
+  .readout .ex{display:none}
+  .method{grid-template-columns:minmax(0,1fr)}
+  #cvSpec{height:240px}#cvSgram{height:210px}#cvVow{height:300px}#cvMfcc{height:250px}
+  main{padding-bottom:calc(120px + env(safe-area-inset-bottom,0px))}
+  .lede{margin-bottom:1.2rem}
+  .controls{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;border-bottom:0;padding-bottom:6px}
+  .seg{display:grid}
+  #vowels{grid-template-columns:repeat(5,minmax(0,1fr))}
+  .controls fieldset:nth-of-type(2) .seg{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .seg label{min-height:46px;padding:6px 4px;display:flex;align-items:center;justify-content:center;line-height:1.15;font-size:1rem}
+  .field input{width:100%;min-height:44px}
+  .recbar{position:fixed;left:0;right:0;bottom:0;z-index:10;background:var(--paper);border-top:1px solid var(--ink);
+    padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px))}
+  .recbar .actions{flex-wrap:nowrap;gap:10px}
+  #rec{flex:1 1 auto;min-height:54px;font-size:1.15rem}
+  .btn2{min-height:54px;display:flex;align-items:center;padding:0 14px;font-size:.95rem;text-align:center;line-height:1.1}
+  .meter{width:100%;margin-top:6px}
+  .readout{order:-1}
+  .guide{order:-1}
+  .grid.a{gap:16px}
+  .guide table,.guide tbody,.guide tr,.guide td{display:block;width:100%}
+  .guide tr:first-child{display:none}
+  .guide tr{border-bottom:1px solid var(--rule);padding:8px 0}
+  .guide tr.sep{border-bottom:1px solid var(--ink3)}
+  .guide td,.guide tr.sep td{border:0;padding:2px 0;white-space:normal}
+  .guide td::before{content:attr(data-label);display:block;font-size:.8rem;color:var(--ink3)}
+  .guide td:first-child{font-size:1.15rem}
+  .guide td:first-child::before{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Graba una vocal y mira su huella acústica</h1>
+    <p class="byline">Ana Catalina Muñoz A.<br><span>Psicóloga Clínica Infantil y Juvenil</span></p>
+    <p class="lede">Sostén una vocal durante uno o dos segundos, a unos 20 cm del micrófono y a volumen cómodo. La página calcula su espectro, los dos primeros formantes y 13 coeficientes MFCC, para comparar vocales, tonos y voces.</p>
+  </header>
+
+  <p id="envWarn" class="warn" hidden></p>
+  <section class="controls" aria-label="Grabación">
+    <fieldset>
+      <legend>Vocal</legend>
+      <div class="seg" id="vowels">
+        <input type="radio" name="vowel" id="v-a" value="a" checked><label for="v-a">/a/</label>
+        <input type="radio" name="vowel" id="v-e" value="e"><label for="v-e">/e/</label>
+        <input type="radio" name="vowel" id="v-i" value="i"><label for="v-i">/i/</label>
+        <input type="radio" name="vowel" id="v-o" value="o"><label for="v-o">/o/</label>
+        <input type="radio" name="vowel" id="v-u" value="u"><label for="v-u">/u/</label>
+      </div>
+    </fieldset>
+    <label class="field"><span>Etiqueta</span><input id="label" value="a" maxlength="14" autocomplete="off"></label>
+    <fieldset>
+      <legend>Tipo de voz</legend>
+      <div class="seg">
+        <input type="radio" name="voice" id="t-grave" value="grave" checked><label for="t-grave">Adulta grave</label>
+        <input type="radio" name="voice" id="t-aguda" value="aguda"><label for="t-aguda">Adulta aguda</label>
+        <input type="radio" name="voice" id="t-nino" value="nino"><label for="t-nino">Niño/a o bebé</label>
+      </div>
+    </fieldset>
+    <div class="recbar">
+      <div class="actions">
+        <button id="rec" type="button">Grabar</button>
+        <label class="btn2">Cargar audio<input type="file" id="file" accept="audio/*" style="position:absolute;opacity:0;width:1px;height:1px"></label>
+      </div>
+      <div class="meter" id="meter" aria-hidden="true"><span></span></div>
+    </div>
+  </section>
+  <p id="status" role="status" aria-live="polite">Elige la vocal y el tipo de voz, y presiona Grabar. La grabación se detiene sola a los 3 segundos.</p>
+  <details class="help" id="help">
+    <summary>¿No aparece el permiso del micrófono?</summary>
+    <p>Abre la página directamente en Chrome (Android) o Safari (iPhone), no dentro de WhatsApp, Instagram, Facebook o la aplicación de Google. Si llegaste desde un enlace en otra aplicación, toca el menú (⋮ o el ícono de compartir) y elige Abrir en el navegador.</p>
+    <p>En iPhone: ve a Ajustes, Safari, Micrófono y elige Preguntar o Permitir. También puedes tocar aA en la barra de direcciones, Configuración del sitio web, Micrófono.</p>
+    <p>En Android: en Chrome, toca el ícono a la izquierda de la dirección, entra a Permisos y activa Micrófono. Si aparece como bloqueado, cámbialo y recarga la página.</p>
+    <p>Cierra otras aplicaciones que puedan estar usando el micrófono, como una llamada o una nota de voz. Si nada funciona, graba una nota de voz con el celular y súbela con Cargar audio.</p>
+  </details>
+
+  <section class="grid a">
+    <figure>
+      <figcaption>Espectro promedio</figcaption>
+      <canvas id="cvSpec" aria-label="Espectro promedio de la grabación seleccionada"></canvas>
+      <p class="note">La línea delgada muestra los armónicos: la fuente, es decir, la vibración de los pliegues vocales. La línea gruesa es la envolvente LPC: el filtro, la forma del tracto vocal. Sus picos son los formantes.</p>
+    </figure>
+    <aside class="readout" aria-label="Valores medidos">
+      <dl>
+        <div><dt>F0</dt><dd id="oF0">–</dd></div>
+        <div><dt>F1</dt><dd id="oF1">–</dd></div>
+        <div><dt>F2</dt><dd id="oF2">–</dd></div>
+      </dl>
+      <p class="ex" style="margin-top:18px">F0 es el tono de la voz y depende de la fuente.</p>
+      <p class="ex">F1 sube cuando la boca se abre más, como en /a/, y baja cuando la lengua está alta, como en /i/ y /u/.</p>
+      <p class="ex">F2 sube cuando la lengua va hacia adelante, como en /i/, y baja cuando va hacia atrás o se redondean los labios, como en /u/ y /o/.</p>
+    </aside>
+  </section>
+
+  <figure>
+    <figcaption>Espectrograma</figcaption>
+    <canvas id="cvSgram" aria-label="Espectrograma de la grabación seleccionada"></canvas>
+    <p class="note">Tiempo en el eje horizontal, frecuencia en el vertical; lo más oscuro tiene más energía. Los puntos marcan F1 y F2 en los tramos con suficiente energía, que son los que entran en el análisis.</p>
+  </figure>
+
+  <section class="grid b">
+    <figure>
+      <figcaption>Espacio vocálico (F1 × F2)</figcaption>
+      <canvas id="cvVow" aria-label="Espacio vocálico con todas las grabaciones"></canvas>
+      <label class="check"><input type="checkbox" id="showRef" checked> Mostrar referencia aproximada de adultos hispanohablantes</label>
+      <p class="note">Ejes invertidos según la convención fonética: las vocales anteriores quedan a la izquierda y las cerradas arriba.</p>
+    </figure>
+    <figure>
+      <figcaption>MFCC promedio (c1 a c12)</figcaption>
+      <canvas id="cvMfcc" aria-label="Coeficientes MFCC de las grabaciones seleccionadas"></canvas>
+      <div id="mfccVals" class="mvals" aria-label="Valores de los 13 MFCC"></div>
+      <p class="note">Cada coeficiente resume un aspecto de la forma global del espectro: c1 su inclinación general, c2 su curvatura y los siguientes, detalles cada vez más finos. c0 refleja sobre todo la energía, por eso aparece solo en la tabla.</p>
+    </figure>
+  </section>
+
+  <section>
+    <h2>Grabaciones</h2>
+    <ul id="recList" class="recs"></ul>
+    <p class="note">Cada grabación tiene su propio color, que se mantiene en el espectro, el espacio vocálico y los MFCC. Selecciona una grabación para ver su espectro y espectrograma, y marca Comparar para superponer sus MFCC.</p>
+  </section>
+
+  <section class="method">
+   <div>
+    <h2>Cómo se calcula</h2>
+    <p>Formantes: la señal se remuestrea al doble del techo de formantes (5.000 Hz para voces adultas graves, 5.500 Hz para agudas y 8.000 Hz para niños y bebés), se aplica pre-énfasis desde 50 Hz y se estima un modelo LPC de orden 10 en ventanas Hamming de 25 ms cada 10 ms. F1 y F2 son la mediana de los cuadros con energía suficiente. F0 se estima por autocorrelación normalizada entre 60 y 1.200 Hz.</p>
+    <p>MFCC: parámetros equivalentes a los valores por defecto de librosa.feature.mfcc (remuestreo a 22.050 Hz, n_fft 2048, hop 512, ventana Hann centrada, 128 bandas mel tipo Slaney, power_to_db con top_db 80, DCT tipo II ortonormal). Se promedian los cuadros con energía suficiente.</p>
+    <p>Los valores dependen del micrófono, la distancia y el ruido del aula, así que sirven para comparar dentro de la sesión, no como medida clínica. Nada se envía ni se guarda: el audio se analiza en este navegador.</p>
+   </div>
+   <div class="guide">
+    <h2>Cómo leer los MFCC</h2>
+    <p>Imagina el espectro como la silueta de una montaña: dónde tiene picos, hacia qué lado se inclina y qué tan rugosa es. Cada MFCC describe un rasgo de esa silueta. Los primeros describen la forma general, que depende de cómo ponemos la lengua y la boca; los últimos describen la textura fina, que depende más de cómo vibran los pliegues vocales.</p>
+    <p>Para leer la tabla: una vocal <em>abierta</em> se dice con la boca abierta y la lengua abajo (/a/); una <em>cerrada</em>, con la lengua arriba (/i/, /u/). Una vocal <em>anterior</em> se dice con la lengua hacia adelante (/i/, /e/); una <em>posterior</em>, hacia atrás (/a/, /o/, /u/). En /o/ y /u/ además se <em>redondean</em> los labios.</p>
+    <div class="scroll">
+    <table aria-label="Interpretación de los coeficientes MFCC">
+      <tr><th scope="col">MFCC</th><th scope="col">Valor alto</th><th scope="col">Valor bajo</th><th scope="col">Qué rasgo refleja</th></tr>
+      <tr><td data-label="MFCC">c1</td><td data-label="Valor alto">Posteriores /a/, /o/, /u/</td><td data-label="Valor bajo">Anteriores /i/, /e/</td><td data-label="Qué rasgo refleja">Lengua adelante o atrás</td></tr>
+      <tr><td data-label="MFCC">c2</td><td data-label="Valor alto">Cerradas /i/, /u/</td><td data-label="Valor bajo">Abierta /a/</td><td data-label="Qué rasgo refleja">Boca abierta o cerrada</td></tr>
+      <tr><td data-label="MFCC">c3</td><td data-label="Valor alto">Anteriores /i/, /e/; el más alto es /i/</td><td data-label="Valor bajo">Posteriores /a/, /o/, /u/; el más bajo es /a/</td><td data-label="Qué rasgo refleja">Combina los dos rasgos anteriores: separa /i/ (adelante y cerrada) de /a/ (atrás y abierta)</td></tr>
+      <tr><td data-label="MFCC">c4</td><td data-label="Valor alto">Anteriores /i/, /e/</td><td data-label="Valor bajo">Posteriores /a/, /o/, /u/</td><td data-label="Qué rasgo refleja">Lengua adelante o atrás, sobre todo en tractos vocales cortos (voces infantiles o agudas)</td></tr>
+      <tr><td data-label="MFCC">c5</td><td data-label="Valor alto">Posteriores /a/, /o/, /u/</td><td data-label="Valor bajo">Anteriores /i/, /e/</td><td data-label="Qué rasgo refleja">Lengua adelante o atrás</td></tr>
+      <tr><td data-label="MFCC">c6</td><td data-label="Valor alto">/a/ (posterior y abierta)</td><td data-label="Valor bajo">/i/ (anterior y cerrada)</td><td data-label="Qué rasgo refleja">Cómo se reparte la energía en la zona media del espectro; mezcla ambos rasgos</td></tr>
+      <tr><td data-label="MFCC">c7</td><td data-label="Valor alto">/a/ (abierta, labios sin redondear; F1 alto)</td><td data-label="Valor bajo">/u/ (cerrada, labios redondeados; F1 bajo)</td><td data-label="Qué rasgo refleja">Apertura de la boca y redondeamiento de los labios</td></tr>
+      <tr class="sep"><td data-label="MFCC">c8</td><td data-label="Valor alto">Anteriores /i/, /e/, con F3 marcado</td><td data-label="Valor bajo">Posteriores /a/, /o/, /u/, con F2 y F3 separados</td><td data-label="Qué rasgo refleja">Lengua adelante o atrás, pero no separa bien las vocales</td></tr>
+      <tr><td data-label="MFCC">c9 y c10</td><td data-label="Valor alto">Vibración de los pliegues vocales más irregular</td><td data-label="Valor bajo">Vibración más regular, menos ruido</td><td data-label="Qué rasgo refleja">Ya no depende de la vocal sino de la fuente: cómo suena la vibración</td></tr>
+      <tr><td data-label="MFCC">c11 y c12</td><td data-label="Valor alto">Textura fina irregular, voz menos periódica (soplo, aspereza)</td><td data-label="Valor bajo">Textura fina regular, voz periódica y estable</td><td data-label="Qué rasgo refleja">Detalles finos del espectro; no distinguen vocales</td></tr>
+    </table>
+    </div>
+    <p style="margin-top:.7rem">Por encima de la línea, los coeficientes hablan sobre todo del filtro (la forma del tracto vocal); por debajo, de la fuente. Son tendencias de grupo: en una grabación concreta pueden variar según la persona, la edad y el micrófono.</p>
+   </div>
+  </section>
+</main>
+
+<script>
+'use strict';
+const MAX_REC = 3, MAX_FILE = 10;
+const VOICES = { grave:{maxF:5000, label:'Adulta grave'}, aguda:{maxF:5500, label:'Adulta aguda'}, nino:{maxF:8000, label:'Niño/a o bebé'} };
+const REF = [['i',300,2300],['e',480,1950],['a',750,1350],['o',500,950],['u',330,800]];
+const NCOL = 8;
+const colOf = r => css('--c'+r.ci);
+const nf0 = new Intl.NumberFormat('es-CO',{maximumFractionDigits:0});
+const nf1 = new Intl.NumberFormat('es-CO',{minimumFractionDigits:1,maximumFractionDigits:1});
+const $ = s => document.querySelector(s);
+
+/* ---------------- DSP ---------------- */
+function nextPow2(n){ let p=1; while(p<n) p<<=1; return p; }
+function fft(re, im){
+  const n = re.length;
+  for(let i=1,j=0;i<n;i++){ let bit=n>>1; for(;j&bit;bit>>=1) j^=bit; j^=bit;
+    if(i<j){ let t=re[i]; re[i]=re[j]; re[j]=t; t=im[i]; im[i]=im[j]; im[j]=t; } }
+  for(let len=2;len<=n;len<<=1){
+    const ang=-2*Math.PI/len, wr=Math.cos(ang), wi=Math.sin(ang), half=len>>1;
+    for(let i=0;i<n;i+=len){ let cr=1, ci=0;
+      for(let k=0;k<half;k++){ const a=i+k, b=a+half;
+        const tr=re[b]*cr-im[b]*ci, ti=re[b]*ci+im[b]*cr;
+        re[b]=re[a]-tr; im[b]=im[a]-ti; re[a]+=tr; im[a]+=ti;
+        const ncr=cr*wr-ci*wi; ci=cr*wi+ci*wr; cr=ncr; } } }
+}
+function resample(x, srIn, srOut){
+  if(srOut >= srIn) return { y: Float64Array.from(x), sr: srIn };
+  const r=srOut/srIn, c=0.94*r, W=Math.ceil(6/c), nOut=Math.floor(x.length*r), y=new Float64Array(nOut);
+  for(let n=0;n<nOut;n++){
+    const t=n/r, k0=Math.max(0,Math.ceil(t-W)), k1=Math.min(x.length-1,Math.floor(t+W)); let s=0;
+    for(let k=k0;k<=k1;k++){ const d=t-k, u=c*d;
+      const sinc = u===0 ? 1 : Math.sin(Math.PI*u)/(Math.PI*u);
+      const w = 0.42+0.5*Math.cos(Math.PI*d/W)+0.08*Math.cos(2*Math.PI*d/W);
+      s += x[k]*c*sinc*w; }
+    y[n]=s; }
+  return { y, sr: srOut };
+}
+const hamming = n => Float64Array.from({length:n},(_,i)=>0.54-0.46*Math.cos(2*Math.PI*i/(n-1)));
+const hannSym = n => Float64Array.from({length:n},(_,i)=>0.5-0.5*Math.cos(2*Math.PI*i/(n-1)));
+const hannPer = n => Float64Array.from({length:n},(_,i)=>0.5-0.5*Math.cos(2*Math.PI*i/n));
+function median(a){ const v=a.filter(Number.isFinite).sort((p,q)=>p-q); if(!v.length) return NaN; const m=v.length>>1; return v.length%2?v[m]:(v[m-1]+v[m])/2; }
+function levinson(r, p){
+  const a=new Float64Array(p+1); a[0]=1; let e=r[0]; if(!(e>0)) return null;
+  for(let i=1;i<=p;i++){ let acc=r[i]; for(let j=1;j<i;j++) acc+=a[j]*r[i-j];
+    const k=-acc/e, prev=a.slice(); for(let j=1;j<i;j++) a[j]=prev[j]+k*prev[i-j];
+    a[i]=k; e*=(1-k*k); if(!(e>0)) return null; }
+  return { a, e };
+}
+function roots(a){
+  const n=a.length-1, re=new Float64Array(n), im=new Float64Array(n);
+  for(let k=0;k<n;k++){ const ang=2*Math.PI*k/n+0.4; re[k]=0.9*Math.cos(ang); im[k]=0.9*Math.sin(ang); }
+  for(let it=0;it<300;it++){ let md=0;
+    for(let i=0;i<n;i++){
+      let pr=1, pi=0; // Horner
+      for(let k=1;k<=n;k++){ const t=pr*re[i]-pi*im[i]+a[k]; pi=pr*im[i]+pi*re[i]; pr=t; }
+      let dr=1, di=0;
+      for(let j=0;j<n;j++){ if(j===i) continue; const xr=re[i]-re[j], xi=im[i]-im[j]; const t=dr*xr-di*xi; di=dr*xi+di*xr; dr=t; }
+      const den=dr*dr+di*di; if(den===0) continue;
+      const qr=(pr*dr+pi*di)/den, qi=(pi*dr-pr*di)/den;
+      re[i]-=qr; im[i]-=qi; md=Math.max(md,Math.hypot(qr,qi)); }
+    if(md<1e-10) break; }
+  return { re, im };
+}
+function formantsFromLPC(a, fs){
+  const {re,im}=roots(a), out=[];
+  for(let i=0;i<re.length;i++){ if(im[i]<=0) continue;
+    const f=Math.atan2(im[i],re[i])*fs/(2*Math.PI), bw=-Math.log(Math.hypot(re[i],im[i]))*fs/Math.PI;
+    if(f>90 && f<fs/2-50 && bw<600) out.push(f); }
+  return out.sort((p,q)=>p-q);
+}
+function autocorr(f, p){ const r=new Float64Array(p+1); for(let l=0;l<=p;l++){ let s=0; for(let i=l;i<f.length;i++) s+=f[i]*f[i-l]; r[l]=s; } return r; }
+function pitchFrame(x, s, n, fs){
+  if(s<0||s+n>x.length) return NaN;
+  const lo=Math.floor(fs/1200), hi=Math.min(Math.ceil(fs/60), Math.floor(n*0.66));
+  let mean=0; for(let i=0;i<n;i++) mean+=x[s+i]; mean/=n;
+  const f=new Float64Array(n); for(let i=0;i<n;i++) f[i]=x[s+i]-mean;
+  const c=new Float64Array(hi+2); let best=0;
+  for(let l=lo;l<=hi+1;l++){ let sxy=0,sxx=0,syy=0;
+    for(let i=0;i+l<n;i++){ sxy+=f[i]*f[i+l]; sxx+=f[i]*f[i]; syy+=f[i+l]*f[i+l]; }
+    c[l]= sxx>0&&syy>0 ? sxy/Math.sqrt(sxx*syy) : 0; if(l<=hi) best=Math.max(best,c[l]); }
+  if(best<0.5) return NaN;
+  for(let l=lo+1;l<=hi;l++){
+    if(c[l]>=0.85*best && c[l]>=c[l-1] && c[l]>=c[l+1]){
+      const d=(c[l-1]-c[l+1])/(2*(c[l-1]-2*c[l]+c[l+1])||1); return fs/(l+(Number.isFinite(d)?d:0)); } }
+  return NaN;
+}
+function hz2mel(f){ const fsp=200/3, mlh=1000, mlm=mlh/fsp, ls=Math.log(6.4)/27; return f<mlh ? f/fsp : mlm+Math.log(f/mlh)/ls; }
+function mel2hz(m){ const fsp=200/3, mlh=1000, mlm=mlh/fsp, ls=Math.log(6.4)/27; return m<mlm ? m*fsp : mlh*Math.exp(ls*(m-mlm)); }
+function melFilters(sr, nfft, nMels){
+  const nb=nfft/2+1, mmax=hz2mel(sr/2), pts=[];
+  for(let i=0;i<nMels+2;i++) pts.push(mel2hz(mmax*i/(nMels+1)));
+  const filters=[];
+  for(let m=0;m<nMels;m++){ const lo=pts[m], c=pts[m+1], hi=pts[m+2], en=2/(hi-lo), w=[]; let k0=-1;
+    for(let k=0;k<nb;k++){ const f=k*sr/nfft; const v=Math.max(0,Math.min((f-lo)/(c-lo),(hi-f)/(hi-c)));
+      if(v>0){ if(k0<0) k0=k; w.push(v*en); } else if(k0>=0) break; }
+    filters.push({k0:Math.max(0,k0), w}); }
+  return filters;
+}
+function mfccLibrosa(x, sr){
+  const {y, sr:fs} = sr>22050 ? resample(x,sr,22050) : {y:Float64Array.from(x), sr};
+  const nfft=2048, hop=512, nb=nfft/2+1, pad=nfft/2, xp=new Float64Array(y.length+2*pad); xp.set(y,pad);
+  const nFr=1+Math.floor((xp.length-nfft)/hop), win=hannPer(nfft), F=melFilters(fs,nfft,128), nM=F.length;
+  const db=[]; let gmax=-Infinity; const re=new Float64Array(nfft), im=new Float64Array(nfft), P=new Float64Array(nb);
+  for(let t=0;t<nFr;t++){ const s=t*hop;
+    for(let i=0;i<nfft;i++){ re[i]=xp[s+i]*win[i]; im[i]=0; } fft(re,im);
+    for(let k=0;k<nb;k++) P[k]=re[k]*re[k]+im[k]*im[k];
+    const row=new Float64Array(nM);
+    for(let m=0;m<nM;m++){ const {k0,w}=F[m]; let e=0; for(let j=0;j<w.length;j++) e+=w[j]*P[k0+j];
+      row[m]=10*Math.log10(Math.max(1e-10,e)); if(row[m]>gmax) gmax=row[m]; }
+    db.push(row); }
+  const floor=gmax-80, out=[];
+  for(const row of db){ for(let m=0;m<nM;m++) if(row[m]<floor) row[m]=floor;
+    const c=new Float64Array(13);
+    for(let k=0;k<13;k++){ let s=0; for(let m=0;m<nM;m++) s+=row[m]*Math.cos(Math.PI*k*(2*m+1)/(2*nM));
+      c[k]=s*(k===0?Math.sqrt(1/nM):Math.sqrt(2/nM)); }
+    out.push({t:t0(out.length), c}); }
+  function t0(i){ return i*hop/fs; }
+  return out;
+}
+
+function analyze(x, sr, voiceKey){
+  const maxF=VOICES[voiceKey].maxF, {y:xr, sr:fs}=resample(x, sr, Math.min(2*maxF, sr));
+  const win=Math.round(0.025*fs), hop=Math.round(0.010*fs), nFr=Math.floor((xr.length-win)/hop)+1;
+  if(!(nFr>=8)) return {error:'La grabación es demasiado corta. Sostén la vocal al menos un segundo.'};
+  const rms=new Float64Array(nFr); let mx=0;
+  for(let i=0;i<nFr;i++){ let s=0; for(let j=0;j<win;j++){ const v=xr[i*hop+j]; s+=v*v; } rms[i]=Math.sqrt(s/win); if(rms[i]>mx) mx=rms[i]; }
+  if(mx<0.002) return {error:'No se detectó voz. Revisa el micrófono, acércate un poco y vuelve a grabar.'};
+  const thr=Math.max(0.2*mx, 0.0015), v=Array.from(rms, r=>r>thr);
+  let voiced=v.map((b,i)=>b&&[i-2,i-1,i+1,i+2].every(j=>j>=0&&j<nFr&&v[j]));
+  if(voiced.filter(Boolean).length<3) voiced=v;
+  const nV=voiced.filter(Boolean).length;
+  if(nV<3) return {error:'La vocal fue muy breve o muy suave. Sostenla uno o dos segundos.'};
+  // pre-énfasis
+  const alpha=Math.exp(-2*Math.PI*50/fs), pe=new Float64Array(xr.length); pe[0]=xr[0];
+  for(let i=1;i<xr.length;i++) pe[i]=xr[i]-alpha*xr[i-1];
+  const p=10, ham=hamming(win), F1s=new Float64Array(nFr).fill(NaN), F2s=new Float64Array(nFr).fill(NaN), rSum=new Float64Array(p+1), f0s=[];
+  const pw=Math.round(0.04*fs), fr=new Float64Array(win);
+  for(let i=0;i<nFr;i++){ if(!voiced[i]) continue;
+    for(let j=0;j<win;j++) fr[j]=pe[i*hop+j]*ham[j];
+    const r=autocorr(fr,p); for(let l=0;l<=p;l++) rSum[l]+=r[l];
+    const L=levinson(r,p); if(L){ const fm=formantsFromLPC(L.a,fs); if(fm.length>0) F1s[i]=fm[0]; if(fm.length>1) F2s[i]=fm[1]; }
+    f0s.push(pitchFrame(xr, i*hop+Math.round(win/2)-Math.round(pw/2), pw, fs)); }
+  const F1=median(Array.from(F1s)), F2=median(Array.from(F2s)), F0=median(f0s);
+  // espectro promedio
+  const sw=Math.round(0.05*fs), nfft=Math.max(4096,nextPow2(sw)*2), hw=hannSym(sw), nb=nfft/2, spec=new Float64Array(nb+1);
+  const re=new Float64Array(nfft), im=new Float64Array(nfft); let cnt=0;
+  for(let i=0;i<nFr;i+=2){ if(!voiced[i]) continue; const c=i*hop+Math.round(win/2), s=c-Math.round(sw/2);
+    if(s<0||s+sw>xr.length) continue;
+    re.fill(0); im.fill(0); for(let j=0;j<sw;j++) re[j]=xr[s+j]*hw[j]; fft(re,im);
+    for(let k=0;k<=nb;k++) spec[k]+=re[k]*re[k]+im[k]*im[k]; cnt++; }
+  const specDb=Array.from(spec, v=>10*Math.log10(v/Math.max(1,cnt)+1e-20)); const smax=Math.max(...specDb);
+  for(let k=0;k<specDb.length;k++) specDb[k]-=smax;
+  // envolvente LPC promedio
+  const envF=[], envDb=[]; const L=levinson(rSum,p);
+  if(L){ for(let k=0;k<=400;k++){ const f=k*(fs/2)/400, w=2*Math.PI*f/fs; let ar=0, ai=0;
+      for(let j=0;j<=p;j++){ ar+=L.a[j]*Math.cos(w*j); ai-=L.a[j]*Math.sin(w*j); }
+      envF.push(f); envDb.push(-10*Math.log10(ar*ar+ai*ai+1e-20)); }
+    const em=Math.max(...envDb); for(let k=0;k<envDb.length;k++) envDb[k]-=em; }
+  // MFCC
+  const mf=mfccLibrosa(x, sr), mean=new Float64Array(13); let mc=0;
+  for(const {t,c} of mf){ const i=Math.round((t*fs-win/2)/hop); if(i>=0&&i<nFr&&voiced[i]){ for(let k=0;k<13;k++) mean[k]+=c[k]; mc++; } }
+  if(mc===0){ for(const {c} of mf) for(let k=0;k<13;k++) mean[k]+=c[k]; mc=mf.length; }
+  for(let k=0;k<13;k++) mean[k]/=mc;
+  return { xr, pe, fs, maxF:fs/2, win, hop, nFr, voiced, F1s, F2s, F0, F1, F2, specDb, specFs:fs, nfft, envF, envDb, mfcc:Array.from(mean), dur:xr.length/fs };
+}
+
+/* ---------------- Estado ---------------- */
+const recs=[]; let curId=null, nextId=1, ac=null, recState=null;
+function voiceKey(){ return document.querySelector('input[name=voice]:checked').value; }
+function setStatus(t){ $('#status').textContent=t; }
+function getAC(){ if(!ac) ac=new (window.AudioContext||window.webkitAudioContext)(); return ac; }
+
+document.querySelectorAll('input[name=vowel]').forEach(r=>r.addEventListener('change',()=>{ $('#label').value=r.value; }));
+
+$('#rec').addEventListener('click', ()=>{ recState ? stopRec() : startRec(); });
+async function startRec(){
+  const a=getAC(); try{ a.resume(); }catch(e){}
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ setStatus('Este navegador no permite grabar aquí. Abre la página en Chrome o Safari, o usa Cargar audio.'); $('#help').open=true; return; }
+  let stream;
+  try{
+    try{ stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}}); }
+    catch(e){ if(e&&(e.name==='OverconstrainedError'||e.name==='TypeError')) stream=await navigator.mediaDevices.getUserMedia({audio:true}); else throw e; }
+  }catch(e){
+    const n=e&&e.name; let m;
+    if(n==='NotAllowedError'||n==='SecurityError') m='El micrófono está bloqueado para esta página. Mira las instrucciones de abajo para permitirlo y luego recarga la página.';
+    else if(n==='NotFoundError') m='No se encontró un micrófono en este dispositivo. Puedes usar Cargar audio.';
+    else if(n==='NotReadableError'||n==='AbortError') m='Otra aplicación está usando el micrófono. Ciérrala y vuelve a intentar.';
+    else m='No fue posible acceder al micrófono. Abre la página en Chrome o Safari, o usa Cargar audio.';
+    setStatus(m); $('#help').open=true; $('#status').scrollIntoView({block:'center'}); return; }
+  try{ await a.resume(); }catch(e){}
+  const src=a.createMediaStreamSource(stream), proc=a.createScriptProcessor(4096,1,1), mute=a.createGain(); mute.gain.value=0;
+  const chunks=[], bar=$('#meter span');
+  proc.onaudioprocess=e=>{ const d=e.inputBuffer.getChannelData(0); chunks.push(new Float32Array(d));
+    let s=0; for(let i=0;i<d.length;i++) s+=d[i]*d[i]; bar.style.width=Math.min(100,Math.sqrt(s/d.length)*600)+'%'; };
+  src.connect(proc); proc.connect(mute); mute.connect(a.destination);
+  const t0=performance.now();
+  recState={stream,src,proc,mute,chunks,t0,timer:setInterval(()=>{ const t=(performance.now()-t0)/1000;
+    $('#rec').textContent=`Detener (${nf1.format(Math.max(0,MAX_REC-t))} s)`; if(t>=MAX_REC) stopRec(); },100)};
+  $('#rec').classList.add('on'); $('#rec').textContent=`Detener (${nf1.format(MAX_REC)} s)`; $('#meter').classList.add('on');
+  setStatus('Grabando. Sostén la vocal de forma estable.');
+}
+function stopRec(){
+  const s=recState; if(!s) return; recState=null; clearInterval(s.timer);
+  try{ s.src.disconnect(); s.proc.disconnect(); s.mute.disconnect(); }catch(e){}
+  s.stream.getTracks().forEach(t=>t.stop());
+  $('#rec').classList.remove('on'); $('#rec').textContent='Grabar'; $('#meter').classList.remove('on'); $('#meter span').style.width='0';
+  let n=0; for(const c of s.chunks) n+=c.length; const x=new Float32Array(n); let o=0; for(const c of s.chunks){ x.set(c,o); o+=c.length; }
+  process(x, getAC().sampleRate, 'micrófono');
+}
+$('#file').addEventListener('change', async e=>{
+  const f=e.target.files[0]; e.target.value=''; if(!f) return;
+  setStatus('Leyendo el archivo.');
+  try{
+    const buf=await f.arrayBuffer(), a=getAC();
+    const ab=await new Promise((res,rej)=>{ const p=a.decodeAudioData(buf,res,rej); if(p&&p.then) p.then(res,rej); });
+    const n=Math.min(ab.length, Math.round(MAX_FILE*ab.sampleRate)), x=new Float32Array(n);
+    for(let ch=0;ch<ab.numberOfChannels;ch++){ const d=ab.getChannelData(ch); for(let i=0;i<n;i++) x[i]+=d[i]/ab.numberOfChannels; }
+    process(x, ab.sampleRate, f.name.replace(/\.[^.]+$/,''));
+  }catch(err){ setStatus('No se pudo leer ese archivo. Prueba con un WAV, MP3 o M4A.'); }
+});
+function process(x, sr, origin){
+  setStatus('Analizando.');
+  setTimeout(()=>{
+    const vk=voiceKey(), res=analyze(x, sr, vk);
+    if(res.error){ setStatus(res.error); return; }
+    const label=($('#label').value||'?').trim().slice(0,14);
+    const rec={ id:nextId, ci:(nextId-1)%NCOL, label, voice:vk, compare:false, origin, ...res }; nextId++;
+    recs.push(rec); if(recs.length>14) recs.shift(); curId=rec.id;
+    const prev=recs.filter(r=>r.id!==rec.id).slice(-2); prev.forEach(r=>r.compare=true);
+    setStatus(`Listo: /${label}/ con F1 ${fmtHz(rec.F1)} y F2 ${fmtHz(rec.F2)}. Graba otra vocal para comparar.`);
+    renderAll();
+    if(window.matchMedia('(max-width:820px)').matches){
+      const smooth=!window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      document.querySelector('.grid.a').scrollIntoView({behavior:smooth?'smooth':'auto',block:'start'}); }
+  }, 40);
+}
+const fmtHz = v => Number.isFinite(v) ? nf0.format(v)+' Hz' : 'sin dato';
+
+/* ---------------- Dibujo ---------------- */
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const FONT = '"Times New Roman", Times, "Liberation Serif", serif';
+function prep(cv){
+  const dpr=window.devicePixelRatio||1, w=cv.clientWidth, h=cv.clientHeight;
+  if(cv.width!==Math.round(w*dpr)||cv.height!==Math.round(h*dpr)){ cv.width=Math.round(w*dpr); cv.height=Math.round(h*dpr); }
+  const g=cv.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,w,h); return {g,w,h};
+}
+function ticks(a, b, n){
+  const span=Math.abs(b-a)||1, raw=span/n, mag=Math.pow(10,Math.floor(Math.log10(raw))), st=[1,2,2.5,5,10].map(s=>s*mag).find(s=>s>=raw);
+  const lo=Math.min(a,b), hi=Math.max(a,b), out=[]; for(let v=Math.ceil(lo/st)*st; v<=hi+1e-9; v+=st) out.push(+v.toFixed(6)); return out;
+}
+function emptyMsg(g,w,h,t){ g.fillStyle=css('--ink3'); g.font=`italic 17px ${FONT}`; g.textAlign='center'; g.textBaseline='middle'; g.fillText(t,w/2,h/2); }
+function frameAxes(g, box, xs, ys, xl, yl, fx, fy, xTop=false, yRight=false){
+  const {l,t,r,b}=box; g.strokeStyle=css('--rule'); g.lineWidth=1; g.font=`14px ${FONT}`; g.fillStyle=css('--ink2');
+  for(const v of xs){ const X=fx(v); g.beginPath(); g.moveTo(X,t); g.lineTo(X,b); g.stroke();
+    g.textAlign='center'; g.textBaseline=xTop?'bottom':'top'; g.fillText(Number.isInteger(v)?nf0.format(v):nf1.format(v), X, xTop? t-4 : b+4); }
+  for(const v of ys){ const Y=fy(v); g.beginPath(); g.moveTo(l,Y); g.lineTo(r,Y); g.stroke();
+    g.textAlign=yRight?'left':'right'; g.textBaseline='middle'; g.fillText(nf0.format(v), yRight? r+5 : l-5, Y); }
+  g.strokeStyle=css('--ink'); g.strokeRect(l,t,r-l,b-t);
+  g.font=`15px ${FONT}`; g.fillStyle=css('--ink');
+  g.textAlign='center'; g.textBaseline=xTop?'bottom':'top'; g.fillText(xl,(l+r)/2, xTop? t-22 : b+22);
+  g.save(); g.translate(yRight? r+48 : l-44,(t+b)/2); g.rotate(-Math.PI/2); g.textBaseline='middle'; g.fillText(yl,0,0); g.restore();
+}
+const cur = () => recs.find(r=>r.id===curId);
+
+function drawSpec(){
+  const {g,w,h}=prep($('#cvSpec')), rec=cur(), maxF=rec?rec.maxF:5000;
+  const box={l:58,t:16,r:w-14,b:h-46}, fx=f=>box.l+(f/maxF)*(box.r-box.l), fy=d=>box.t+(-d/70)*(box.b-box.t);
+  frameAxes(g,box,ticks(0,maxF,w<520?4:6),[0,-20,-40,-60],'Frecuencia (Hz)','dB relativos',fx,fy);
+  if(!rec){ emptyMsg(g,w,h-30,'Graba una vocal para ver su espectro'); return; }
+  g.save(); g.beginPath(); g.rect(box.l,box.t,box.r-box.l,box.b-box.t); g.clip();
+  g.strokeStyle=css('--ink3'); g.lineWidth=1; g.beginPath();
+  for(let k=0;k<rec.specDb.length;k++){ const f=k*rec.specFs/rec.nfft; if(f>maxF) break; const X=fx(f), Y=fy(Math.max(-75,rec.specDb[k])); k?g.lineTo(X,Y):g.moveTo(X,Y); } g.stroke();
+  g.strokeStyle=colOf(rec); g.lineWidth=2.6; g.beginPath();
+  rec.envF.forEach((f,k)=>{ const X=fx(f), Y=fy(Math.max(-75,rec.envDb[k])); k?g.lineTo(X,Y):g.moveTo(X,Y); }); g.stroke();
+  g.setLineDash([5,4]); g.lineWidth=1.2; g.font=`16px ${FONT}`; g.fillStyle=css('--ink'); g.textAlign='left'; g.textBaseline='top';
+  [['F1',rec.F1,0],['F2',rec.F2,1]].forEach(([n,v,row])=>{ if(!Number.isFinite(v)) return; const X=fx(v); g.beginPath(); g.moveTo(X,box.t); g.lineTo(X,box.b); g.stroke();
+    const txt=`${n} ${nf0.format(v)}`, tw=g.measureText(txt).width, tx = X+5+tw>box.r ? X-5-tw : X+5;
+    g.fillStyle=css('--paper'); g.fillRect(tx-2,box.t+4+row*20,tw+4,18); g.fillStyle=css('--ink'); g.fillText(txt, tx, box.t+5+row*20); });
+  g.restore();
+}
+
+function drawSgram(){
+  const {g,w,h}=prep($('#cvSgram')), rec=cur(), maxF=rec?rec.maxF:5000, dur=rec?rec.dur:3;
+  const box={l:58,t:12,r:w-14,b:h-46}, fx=t=>box.l+(t/dur)*(box.r-box.l), fy=f=>box.b-(f/maxF)*(box.b-box.t);
+  if(!rec){ frameAxes(g,box,ticks(0,dur,w<520?4:6),ticks(0,maxF,4),'Tiempo (s)','Hz',fx,fy); emptyMsg(g,w,h-30,'El espectrograma aparece al grabar'); return; }
+  if(!rec.sg){ // calcular una vez
+    const cols=480, wl=Math.round(0.006*rec.fs), nfft=Math.max(256,nextPow2(wl)*2), nb=nfft/2, hw=hannSym(wl);
+    const step=Math.max(1,(rec.pe.length-wl)/cols), m=new Float32Array(cols*nb); let mx=-Infinity;
+    const re=new Float64Array(nfft), im=new Float64Array(nfft);
+    for(let c=0;c<cols;c++){ const s=Math.floor(c*step); re.fill(0); im.fill(0);
+      for(let j=0;j<wl&&s+j<rec.pe.length;j++) re[j]=rec.pe[s+j]*hw[j]; fft(re,im);
+      for(let k=0;k<nb;k++){ const d=10*Math.log10(re[k]*re[k]+im[k]*im[k]+1e-14); m[c*nb+k]=d; if(d>mx) mx=d; } }
+    rec.sg={cols,nb,m,mx};
+  }
+  const {cols,nb,m,mx}=rec.sg, off=document.createElement('canvas'); off.width=cols; off.height=nb;
+  const oc=off.getContext('2d'), img=oc.createImageData(cols,nb);
+  const hex=s=>{ const t=document.createElement('canvas').getContext('2d'); t.fillStyle=s; const v=t.fillStyle; return [1,3,5].map(i=>parseInt(v.slice(i,i+2),16)); };
+  const P=hex(css('--paper')), I=hex(css('--ink'));
+  for(let c=0;c<cols;c++) for(let k=0;k<nb;k++){ const v=Math.min(1,Math.max(0,(m[c*nb+k]-(mx-50))/50)), q=Math.pow(v,1.3), o=((nb-1-k)*cols+c)*4;
+    img.data[o]=P[0]+(I[0]-P[0])*q; img.data[o+1]=P[1]+(I[1]-P[1])*q; img.data[o+2]=P[2]+(I[2]-P[2])*q; img.data[o+3]=255; }
+  oc.putImageData(img,0,0); g.imageSmoothingEnabled=true; g.drawImage(off,box.l,box.t,box.r-box.l,box.b-box.t);
+  frameAxes(g,box,ticks(0,dur,w<520?4:6),ticks(0,maxF,4),'Tiempo (s)','Hz',fx,fy);
+  g.lineWidth=1;
+  for(let i=0;i<rec.nFr;i++){ if(!rec.voiced[i]) continue; const t=(i*rec.hop+rec.win/2)/rec.fs;
+    for(const v of [rec.F1s[i],rec.F2s[i]]){ if(!Number.isFinite(v)) continue; g.beginPath(); g.arc(fx(t),fy(v),2.4,0,2*Math.PI);
+      g.fillStyle=css('--paper'); g.fill(); g.strokeStyle=css('--ink'); g.stroke(); } }
+  // tramo analizado
+  g.fillStyle=css('--ink'); for(let i=0;i<rec.nFr;i++){ if(!rec.voiced[i]) continue; const t=(i*rec.hop+rec.win/2)/rec.fs; g.fillRect(fx(t)-1.5,box.b+1,3,3); }
+}
+
+function drawVow(){
+  const {g,w,h}=prep($('#cvVow')), pts=recs.filter(r=>Number.isFinite(r.F1)&&Number.isFinite(r.F2)), ref=$('#showRef').checked;
+  let f1a=200,f1b=1000,f2a=500,f2b=3000;
+  for(const r of pts){ f1a=Math.min(f1a,r.F1*0.9); f1b=Math.max(f1b,r.F1*1.1); f2a=Math.min(f2a,r.F2*0.9); f2b=Math.max(f2b,r.F2*1.08); }
+  f1a=Math.floor(f1a/100)*100; f1b=Math.ceil(f1b/100)*100; f2a=Math.floor(f2a/100)*100; f2b=Math.ceil(f2b/100)*100;
+  const box={l:16,t:48,r:w-62,b:h-16};
+  const fx=f2=>box.l+(f2b-f2)/(f2b-f2a)*(box.r-box.l), fy=f1=>box.t+(f1-f1a)/(f1b-f1a)*(box.b-box.t);
+  frameAxes(g,box,ticks(f2a,f2b,w<520?4:5),ticks(f1a,f1b,5),'F2 (Hz)','F1 (Hz)',fx,fy,true,true);
+  if(ref){ g.font=`italic 20px ${FONT}`; g.fillStyle=css('--ink3'); g.textAlign='center'; g.textBaseline='middle';
+    for(const [v,a,b] of REF) g.fillText(v,fx(b),fy(a)); }
+  if(!pts.length){ emptyMsg(g,w,h+20,'Cada vocal grabada aparecerá aquí'); return; }
+  for(const r of pts){ const X=fx(r.F2), Y=fy(r.F1), c=r.id===curId;
+    g.beginPath(); g.arc(X,Y,c?7:5.5,0,2*Math.PI); g.fillStyle=colOf(r); g.fill();
+    if(c){ g.beginPath(); g.arc(X,Y,10,0,2*Math.PI); g.strokeStyle=css('--ink'); g.lineWidth=1.2; g.stroke(); }
+    g.font=`17px ${FONT}`; g.fillStyle=colOf(r); g.textAlign='left'; g.textBaseline='bottom'; g.fillText(`/${r.label}/`, X+9, Y-4); }
+}
+
+function drawMfcc(){
+  const {g,w,h}=prep($('#cvMfcc')), c=cur(), list=recs.filter(r=>r.compare&&r.id!==curId);
+  const shown=c?[c,...list]:[]; let lo=-20, hi=20;
+  for(const r of shown) for(let k=1;k<13;k++){ lo=Math.min(lo,r.mfcc[k]); hi=Math.max(hi,r.mfcc[k]); }
+  const padv=(hi-lo)*0.08; lo-=padv; hi+=padv;
+  const box={l:52,t:14,r:w-14,b:h-46}, fx=k=>box.l+(k-0.5)/12*(box.r-box.l), fy=v=>box.t+(hi-v)/(hi-lo)*(box.b-box.t);
+  g.strokeStyle=css('--rule'); g.lineWidth=1; g.font=`14px ${FONT}`; g.fillStyle=css('--ink2');
+  for(const v of ticks(lo,hi,5)){ const Y=fy(v); g.beginPath(); g.moveTo(box.l,Y); g.lineTo(box.r,Y); g.stroke(); g.textAlign='right'; g.textBaseline='middle'; g.fillText(nf0.format(v),box.l-5,Y); }
+  g.font=`${w<520?12:14}px ${FONT}`; for(let k=1;k<13;k++){ g.textAlign='center'; g.textBaseline='top'; g.fillText('c'+k,fx(k),box.b+4); }
+  g.strokeStyle=css('--ink'); g.strokeRect(box.l,box.t,box.r-box.l,box.b-box.t);
+  if(lo<0&&hi>0){ g.beginPath(); g.moveTo(box.l,fy(0)); g.lineTo(box.r,fy(0)); g.lineWidth=1; g.stroke(); }
+  g.font=`15px ${FONT}`; g.fillStyle=css('--ink'); g.textAlign='center'; g.textBaseline='top'; g.fillText('Coeficiente',(box.l+box.r)/2,box.b+22);
+  if(!c){ emptyMsg(g,w,h-30,'Los MFCC aparecen al grabar'); return; }
+  const legend=[];
+  const line=(r,isC)=>{ const col=colOf(r);
+    g.strokeStyle=col; g.lineWidth=isC?3:1.8; g.globalAlpha=isC?1:0.9; g.beginPath();
+    for(let k=1;k<13;k++){ const X=fx(k),Y=fy(r.mfcc[k]); k>1?g.lineTo(X,Y):g.moveTo(X,Y); } g.stroke(); g.globalAlpha=1;
+    for(let k=1;k<13;k++){ g.beginPath(); g.arc(fx(k),fy(r.mfcc[k]),isC?4.5:3.2,0,2*Math.PI); g.fillStyle=col; g.fill(); } };
+  [...list].reverse().forEach(r=>{ line(r,false); legend.push([r,false]); });
+  line(c,true); legend.unshift([c,true]);
+  g.font=`15px ${FONT}`; let y=box.t+12; const lx=box.r-120;
+  g.fillStyle=css('--paper'); g.globalAlpha=0.85; g.fillRect(lx-8,box.t+2,124,legend.length*20+6); g.globalAlpha=1;
+  for(const [r,isC] of legend){ g.strokeStyle=colOf(r); g.lineWidth=isC?3:1.8;
+    g.beginPath(); g.moveTo(lx,y); g.lineTo(lx+30,y); g.stroke();
+    g.fillStyle=css('--ink'); g.textAlign='left'; g.textBaseline='middle'; g.fillText(`/${r.label}/ #${r.id}`, lx+38, y); y+=20; }
+}
+
+function renderTables(){
+  const c=cur();
+  $('#mfccVals').innerHTML = c ? c.mfcc.map((v,k)=>`<div><span>c${k}</span>${nf1.format(v)}</div>`).join('') : '';
+  const rl=$('#recList');
+  if(!recs.length){ rl.innerHTML='<li class="empty">Aún no hay grabaciones.</li>'; return; }
+  const hz=v=>Number.isFinite(v)?nf0.format(v):'–';
+  rl.innerHTML=[...recs].reverse().map(r=>`<li class="${r.id===curId?'cur':''}">
+    <label class="pick"><input type="radio" name="cur" value="${r.id}" ${r.id===curId?'checked':''}>
+      <span class="sw" style="background:var(--c${r.ci})" aria-hidden="true"></span>
+      <span>/${esc(r.label)}/<small>#${r.id} ${VOICES[r.voice].label}</small></span></label>
+    <button type="button" data-del="${r.id}" aria-label="Quitar grabación ${r.id}">Quitar</button>
+    <span class="vals"><span><i>F0</i>${hz(r.F0)}</span><span><i>F1</i>${hz(r.F1)}</span><span><i>F2</i>${hz(r.F2)} Hz</span></span>
+    <label class="cmp"><input type="checkbox" data-cmp="${r.id}" ${r.compare&&r.id!==curId?'checked':''} ${r.id===curId?'disabled':''}> Comparar</label></li>`).join('');
+}
+const esc=s=>s.replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
+$('#recList').addEventListener('change',e=>{
+  const t=e.target; if(t.name==='cur'){ curId=+t.value; renderAll(); }
+  else if(t.dataset.cmp){ const r=recs.find(x=>x.id===+t.dataset.cmp); if(r){ r.compare=t.checked; drawMfcc(); } } });
+$('#recList').addEventListener('click',e=>{
+  const id=e.target.dataset&&e.target.dataset.del; if(!id) return; const i=recs.findIndex(r=>r.id===+id); if(i<0) return;
+  recs.splice(i,1); if(curId===+id) curId=recs.length?recs[recs.length-1].id:null; renderAll(); });
+$('#showRef').addEventListener('change',drawVow);
+
+function renderAll(){
+  const c=cur(), set=(id,v)=>{ $(id).innerHTML = Number.isFinite(v) ? `${nf0.format(v)}<small>Hz</small>` : '–'; };
+  set('#oF0',c&&c.F0); set('#oF1',c&&c.F1); set('#oF2',c&&c.F2);
+  drawSpec(); drawSgram(); drawVow(); drawMfcc(); renderTables();
+}
+let rz; new ResizeObserver(()=>{ clearTimeout(rz); rz=setTimeout(renderAll,60); }).observe(document.body);
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',renderAll);
+new MutationObserver(renderAll).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+(function(){
+  const ua=navigator.userAgent||'', w=$('#envWarn');
+  const inApp=/FBAN|FBAV|FB_IAB|Instagram|WhatsApp|Line\/|Snapchat|TikTok|musical_ly|; wv\)|GSA\//i.test(ua);
+  if(!window.isSecureContext){ w.textContent='Esta dirección no es segura (no empieza por https), así que el navegador no permite usar el micrófono. Usa la dirección https de la página.'; w.hidden=false; }
+  else if(inApp){ w.textContent='Abriste la página dentro de otra aplicación, que puede bloquear el micrófono. Para grabar, toca el menú (⋮ o compartir) y elige Abrir en Chrome o Abrir en Safari.'; w.hidden=false; }
+})();
+renderAll();
+</script>
+</body>
+</html>
