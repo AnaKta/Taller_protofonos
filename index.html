@@ -100,6 +100,23 @@ th:first-child,td:first-child,th.l,td.l{text-align:left}
 .guide td:first-child{white-space:nowrap}
 .guide tr.sep td{border-bottom:1px solid var(--ink3)}
 .panels{margin:0 0 1rem;font-size:.95rem}
+.panel[hidden]{display:none}
+.tabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--paper);display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
+  max-width:720px;border:1px solid var(--ink);margin:0 0 24px}
+.tabs button{font:inherit;background:var(--paper);color:var(--ink);border:0;border-right:1px solid var(--rule);padding:8px 6px;min-height:48px;cursor:pointer;line-height:1.15}
+.tabs button:last-child{border-right:0}
+.tabs button[aria-selected="true"]{background:var(--ink);color:var(--paper)}
+.tabs button:focus-visible{outline:2px solid var(--ink3);outline-offset:-5px}
+.nextnav{display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-end;margin:4px 0 30px}
+.nextnav.start{justify-content:flex-start;margin:0 0 20px}
+.linkbtn{font:inherit;background:var(--paper);color:var(--ink);border:1px solid var(--ink);padding:8px 18px;min-height:44px;cursor:pointer}
+.linkbtn:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
+.guide{max-width:900px}
+.guide h2{margin-top:.4rem}
+.guide h2+p{margin-top:0}
+.guide .scroll+p,.guide dl+p{margin-top:.7rem}
+.calc{max-width:760px}
+.calc p{color:var(--ink2);font-size:.95rem}
 .panels div{display:grid;grid-template-columns:5.2em minmax(0,1fr);gap:10px;padding:5px 0;border-bottom:1px solid var(--rule)}
 .panels div:first-child{border-top:1px solid var(--rule)}
 .panels dt{color:var(--ink)}
@@ -132,6 +149,9 @@ th:first-child,td:first-child,th.l,td.l{text-align:left}
   .btn2{min-height:54px;display:flex;align-items:center;padding:0 14px;font-size:.95rem;text-align:center;line-height:1.1}
   .meter{width:100%;margin-top:6px}
   .readout{order:-1}
+  .tabs{margin-bottom:18px}
+  .tabs button{font-size:.98rem;padding:6px 2px}
+  .nextnav .linkbtn{flex:1 1 auto}
   .guide{order:-1}
   .grid.a{gap:16px}
   .guide table,.guide tbody,.guide tr,.guide td{display:block;width:100%}
@@ -155,6 +175,15 @@ th:first-child,td:first-child,th.l,td.l{text-align:left}
   </header>
 
   <p id="envWarn" class="warn" hidden></p>
+  <div id="tabsAnchor"></div>
+  <nav class="tabs" role="tablist" aria-label="Secciones">
+    <button type="button" role="tab" id="tab-grabar" data-tab="grabar" aria-controls="p-grabar" aria-selected="true">Grabar</button>
+    <button type="button" role="tab" id="tab-comparar" data-tab="comparar" aria-controls="p-comparar" aria-selected="false" tabindex="-1">Comparar</button>
+    <button type="button" role="tab" id="tab-leer" data-tab="leer" aria-controls="p-leer" aria-selected="false" tabindex="-1">Cómo leer</button>
+    <button type="button" role="tab" id="tab-calculo" data-tab="calculo" aria-controls="p-calculo" aria-selected="false" tabindex="-1">Cálculo</button>
+  </nav>
+
+  <section class="panel" id="p-grabar" data-tab="grabar" role="tabpanel" aria-labelledby="tab-grabar">
   <section class="controls" aria-label="Grabación">
     <fieldset>
       <legend>Vocal</legend>
@@ -215,7 +244,14 @@ th:first-child,td:first-child,th.l,td.l{text-align:left}
     <canvas id="cvSgram" aria-label="Espectrograma de la grabación seleccionada"></canvas>
     <p class="note">Tiempo en el eje horizontal, frecuencia en el vertical; lo más oscuro tiene más energía. Los puntos marcan F1 y F2 en los tramos con suficiente energía, que son los que entran en el análisis.</p>
   </figure>
+  <div class="nextnav">
+    <button type="button" class="linkbtn" data-go="comparar">Comparar vocales →</button>
+    <button type="button" class="linkbtn" data-go="leer">Cómo interpretarlo →</button>
+  </div>
+  </section>
 
+  <section class="panel" id="p-comparar" data-tab="comparar" role="tabpanel" aria-labelledby="tab-comparar" hidden>
+  <div class="nextnav start"><button type="button" class="linkbtn" data-go="grabar">← Grabar otra vocal</button></div>
   <section class="grid b">
     <figure>
       <figcaption>Espacio vocálico (F1 × F2)</figcaption>
@@ -236,16 +272,20 @@ th:first-child,td:first-child,th.l,td.l{text-align:left}
     <ul id="recList" class="recs"></ul>
     <p class="note">Cada grabación tiene su propio color, que se mantiene en el espectro, el espacio vocálico y los MFCC. Selecciona una grabación para ver su espectro y espectrograma, y marca Comparar para superponer sus MFCC.</p>
   </section>
+  <div class="nextnav"><button type="button" class="linkbtn" data-go="leer">Cómo interpretar los MFCC →</button></div>
+  </section>
 
-  <section class="method">
-   <div>
-    <h2>Cómo se calcula</h2>
-    <p>Formantes: la señal se remuestrea al doble del techo de formantes (5.000 Hz para voces adultas graves, 5.500 Hz para agudas y 8.000 Hz para niños y bebés), se aplica pre-énfasis desde 50 Hz y se estima un modelo LPC de orden 10 en ventanas Hamming de 25 ms cada 10 ms. F1 y F2 son la mediana de los cuadros con energía suficiente. F0 se estima por autocorrelación normalizada entre 60 y 1.200 Hz.</p>
-    <p>MFCC: parámetros equivalentes a los valores por defecto de librosa.feature.mfcc (remuestreo a 22.050 Hz, n_fft 2048, hop 512, ventana Hann centrada, 128 bandas mel tipo Slaney, power_to_db con top_db 80, DCT tipo II ortonormal). Se promedian los cuadros con energía suficiente.</p>
-    <p>Los valores dependen del micrófono, la distancia y el ruido del aula, así que sirven para comparar dentro de la sesión, no como medida clínica. Nada se envía ni se guarda: el audio se analiza en este navegador.</p>
-   </div>
-   <div class="guide">
-    <h2>Cómo leer los MFCC</h2>
+  <section class="panel guide" id="p-leer" data-tab="leer" role="tabpanel" aria-labelledby="tab-leer" hidden>
+    <h2>Cómo leer F0, F1 y F2</h2>
+    <p>La voz se produce en dos pasos, según el modelo fuente-filtro. Primero, los pliegues vocales vibran y producen un sonido: la fuente. Después, el tracto vocal (garganta, boca y labios) moldea ese sonido como un filtro.</p>
+    <dl class="panels">
+      <div><dt>F0</dt><dd>Es el tono de la voz y depende de la fuente: cuántas veces por segundo vibran los pliegues vocales. La F0 de un bebé es mucho más alta que la de un adulto.</dd></div>
+      <div><dt>F1</dt><dd>Depende del filtro y refleja el Panel A, la altura de la lengua: es alto en vocales bajas como /a/ y bajo en vocales altas como /i/ y /u/.</dd></div>
+      <div><dt>F2</dt><dd>Depende del filtro y refleja el Panel B, la posición de la lengua: es alto en vocales anteriores como /i/ y bajo en posteriores como /u/ y /o/. Redondear los labios (Panel C) también lo baja.</dd></div>
+    </dl>
+    <p>Los formantes de un bebé son más altos que los de un adulto porque su tracto vocal es más corto. A medida que crece, los formantes bajan.</p>
+
+    <h2 style="margin-top:1.8rem">Cómo leer los MFCC</h2>
     <p>Imagina el espectro como la silueta de una montaña. Cada MFCC compara cuánta energía hay en unas zonas de esa silueta frente a otras: mide un tipo de desequilibrio de energía. Como la posición de la lengua y los labios cambia la forma de toda la silueta, esos desequilibrios reflejan los mismos rasgos que describen los formantes (Iskarous y Vietti, 2025).</p>
     <p>Los rasgos se organizan en tres paneles (Ladefoged y Johnson, 2011):</p>
     <dl class="panels">
@@ -269,7 +309,14 @@ th:first-child,td:first-child,th.l,td.l{text-align:left}
     </table>
     </div>
     <p style="margin-top:.7rem">Por encima de la línea, los coeficientes hablan sobre todo del filtro, es decir, de los paneles. Por debajo, hablan de la fuente. Son tendencias de grupo: en una grabación concreta pueden variar según la persona, la edad y el micrófono.</p>
-   </div>
+  <div class="nextnav"><button type="button" class="linkbtn" data-go="grabar">← Volver a grabar</button></div>
+  </section>
+
+  <section class="panel calc" id="p-calculo" data-tab="calculo" role="tabpanel" aria-labelledby="tab-calculo" hidden>
+    <h2>Cómo se calcula</h2>
+    <p>Formantes: la señal se remuestrea al doble del techo de formantes (5.000 Hz para voces adultas graves, 5.500 Hz para agudas y 8.000 Hz para niños y bebés), se aplica pre-énfasis desde 50 Hz y se estima un modelo LPC de orden 10 en ventanas Hamming de 25 ms cada 10 ms. F1 y F2 son la mediana de los cuadros con energía suficiente. F0 se estima por autocorrelación normalizada entre 60 y 1.200 Hz.</p>
+    <p>MFCC: parámetros equivalentes a los valores por defecto de librosa.feature.mfcc (remuestreo a 22.050 Hz, n_fft 2048, hop 512, ventana Hann centrada, 128 bandas mel tipo Slaney, power_to_db con top_db 80, DCT tipo II ortonormal). Se promedian los cuadros con energía suficiente.</p>
+    <p>Los valores dependen del micrófono, la distancia y el ruido del aula, así que sirven para comparar dentro de la sesión, no como medida clínica. Nada se envía ni se guarda: el audio se analiza en este navegador.</p>
   </section>
 </main>
 
@@ -504,7 +551,7 @@ function process(x, sr, origin){
     const prev=recs.filter(r=>r.id!==rec.id).slice(-2); prev.forEach(r=>r.compare=true);
     setStatus(`Listo: /${label}/ con F1 ${fmtHz(rec.F1)} y F2 ${fmtHz(rec.F2)}. Graba otra vocal para comparar.`);
     renderAll();
-    if(window.matchMedia('(max-width:820px)').matches){
+    if(!$('#p-grabar').hidden && window.matchMedia('(max-width:820px)').matches){
       const smooth=!window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       document.querySelector('.grid.a').scrollIntoView({behavior:smooth?'smooth':'auto',block:'start'}); }
   }, 40);
@@ -664,7 +711,24 @@ new MutationObserver(renderAll).observe(document.documentElement,{attributes:tru
   if(!window.isSecureContext){ w.textContent='Esta dirección no es segura (no empieza por https), así que el navegador no permite usar el micrófono. Usa la dirección https de la página.'; w.hidden=false; }
   else if(inApp){ w.textContent='Abriste la página dentro de otra aplicación, que puede bloquear el micrófono. Para grabar, toca el menú (⋮ o compartir) y elige Abrir en Chrome o Abrir en Safari.'; w.hidden=false; }
 })();
-renderAll();
+const TABS=['grabar','comparar','leer','calculo'];
+function showTab(t, focus){
+  if(!TABS.includes(t)) t='grabar';
+  document.querySelectorAll('.tabs button').forEach(b=>{ const on=b.dataset.tab===t; b.setAttribute('aria-selected',on?'true':'false'); b.tabIndex=on?0:-1; if(on&&focus) b.focus(); });
+  document.querySelectorAll('.panel').forEach(p=>{ p.hidden = p.dataset.tab!==t; });
+  try{ history.replaceState(null,'','#'+t); }catch(e){}
+  const top=$('#tabsAnchor').getBoundingClientRect().top+window.scrollY;
+  if(window.scrollY>top) window.scrollTo(0,top);
+  renderAll();
+}
+document.querySelectorAll('.tabs button').forEach(b=>{
+  b.addEventListener('click',()=>showTab(b.dataset.tab));
+  b.addEventListener('keydown',e=>{ const i=TABS.indexOf(b.dataset.tab);
+    if(e.key==='ArrowRight'){ e.preventDefault(); showTab(TABS[(i+1)%TABS.length],true); }
+    else if(e.key==='ArrowLeft'){ e.preventDefault(); showTab(TABS[(i+TABS.length-1)%TABS.length],true); } });
+});
+document.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>showTab(b.dataset.go)));
+showTab((location.hash||'').slice(1));
 </script>
 </body>
 </html>
